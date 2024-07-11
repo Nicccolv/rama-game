@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rama game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-size: cover;
+            background-position: center;
+        }
+
+        #player {
+            position: absolute;
+            width: 200px; /* Tamaño ajustado */
+            height: 200px; /* Tamaño ajustado */
+            top: 10px;
+            left: 10px;
+            cursor: pointer;
+        }
+
+        #target {
+            position: absolute;
+            width: 200px; /* Tamaño ajustado */
+            height: 200px; /* Tamaño ajustado */
+        }
+
+        .monster {
+            position: absolute;
+            width: 106.67px; /* Tamaño de los monstruos ajustado */
+            height: 106.67px; /* Tamaño de los monstruos ajustado */
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <img id="player" src="image.png" alt="Player">
+        <img id="target" src="target.png" alt="Target">
+    </div>
+    <audio id="background-music" loop></audio>
+    <script>
+        const backgrounds = ['galaxy1.gif', 'galaxy2.gif', 'galaxy3.gif', 'galaxy4.gif'];
+        const musicTracks = ['music1.mp3', 'music2.mp3', 'music3.mp3', 'music4.mp3'];
+        const baseMonsterSpeed = [8, 10, 12, 14]; // Increased speed for more difficulty
+        const monstersPerLevel = 10; // Fixed number of monsters per level
+
+        let player = document.getElementById('player');
+        let target = document.getElementById('target');
+        let music = document.getElementById('background-music');
+        let currentLevel = 1;
+        let offsetX, offsetY;
+        let isDragging = false;
+        let monsters = [];
+
+        document.addEventListener('mousedown', function(e) {
+            if (e.target === player) {
+                isDragging = true;
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+            }
+        });
+
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                player.style.left = `${e.clientX - offsetX}px`;
+                player.style.top = `${e.clientY - offsetY}px`;
+                checkCollision();
+            }
+        });
+
+        function checkCollision() {
+            let playerCenterX = player.offsetLeft + player.offsetWidth / 2;
+            let playerCenterY = player.offsetTop + player.offsetHeight / 2;
+
+            for (let monster of monsters) {
+                let monsterCenterX = monster.offsetLeft + monster.offsetWidth / 2;
+                let monsterCenterY = monster.offsetTop + monster.offsetHeight / 2;
+
+                let distance = Math.sqrt(Math.pow(playerCenterX - monsterCenterX, 2) + Math.pow(playerCenterY - monsterCenterY, 2));
+
+                if (distance < player.offsetWidth / 2 + monster.offsetWidth / 2) {
+                    alert('You got caught by a monster! Game over!');
+                    currentLevel = 1;
+                    resetGame(true);
+                    return; // Terminar la función si se detecta una colisión con un monstruo
+                }
+            }
+
+            let targetRect = target.getBoundingClientRect();
+            let targetCenterX = targetRect.left + targetRect.width / 2;
+            let targetCenterY = targetRect.top + targetRect.height / 2;
+
+            let distanceToTarget = Math.sqrt(Math.pow(playerCenterX - targetCenterX, 2) + Math.pow(playerCenterY - targetCenterY, 2));
+
+            if (distanceToTarget < player.offsetWidth / 2 + targetRect.width / 2) {
+                alert(`Level ${currentLevel} complete!`);
+                currentLevel++;
+                if (currentLevel > 4) {
+                    alert('You win!');
+                    currentLevel = 1;
+                }
+                resetGame();
+            }
+        }
+
+        function moveMonsters() {
+            for (let i = 0; i < monsters.length; i++) {
+                let monster = monsters[i];
+                let direction = monster.dataset.direction;
+
+                // Move the monster
+                let speed = parseInt(monster.dataset.speed);
+                let newX = parseInt(monster.style.left || 0) + speed * (direction.includes('right') ? 1 : -1);
+                let newY = parseInt(monster.style.top || 0) + speed * (direction.includes('down') ? 1 : -1);
+
+                // Bounce off walls
+                if (newX < 0 || newX > window.innerWidth - monster.clientWidth) {
+                    direction = direction.includes('right') ? direction.replace('right', 'left') : direction.replace('left', 'right');
+                }
+                if (newY < 0 || newY > window.innerHeight - monster.clientHeight) {
+                    direction = direction.includes('down') ? direction.replace('down', 'up') : direction.replace('up', 'down');
+                }
+
+                monster.style.left = `${newX}px`;
+                monster.style.top = `${newY}px`;
+                monster.dataset.direction = direction;
+            }
+        }
+
+        function resetGame(reset = false) {
+            if (reset) {
+                currentLevel = 1;
+            }
+            player.style.top = '10px';
+            player.style.left = '10px';
+            isDragging = false; // Desactivar el arrastre al reiniciar el juego
+
+            // Randomize target position for next level
+            let playerRect = player.getBoundingClientRect();
+            let minDistance = Math.max(window.innerWidth, window.innerHeight) / 2; // Mínima distancia del jugador
+            let targetX, targetY;
+            do {
+                targetX = Math.random() * (window.innerWidth - 200);
+                targetY = Math.random() * (window.innerHeight - 200);
+            } while (Math.sqrt(Math.pow(targetX - playerRect.left, 2) + Math.pow(targetY - playerRect.top, 2)) < minDistance);
+
+            target.style.top = `${targetY}px`;
+            target.style.left = `${targetX}px`;
+
+            // Remove old monsters
+            monsters.forEach(monster => monster.remove());
+            monsters = [];
+
+            // Add new monsters
+            for (let i = 0; i < monstersPerLevel; i++) {
+                let monster = document.createElement('img');
+                monster.src = `monster${(i % 4) + 1}.png`;
+                monster.classList.add('monster');
+                monster.style.top = `${Math.random() * (window.innerHeight - 106.67)}px`;
+                monster.style.left = `${Math.random() * (window.innerWidth - 106.67)}px`;
+                monster.dataset.direction = (Math.random() > 0.5 ? 'right' : 'left') + ' ' + (Math.random() > 0.5 ? 'down' : 'up');
+                monster.dataset.speed = baseMonsterSpeed[currentLevel - 1];
+                document.getElementById('game-container').appendChild(monster);
+                monsters.push(monster);
+            }
+
+            // Change background and music for the current level
+            document.getElementById('game-container').style.backgroundImage = `url(${backgrounds[currentLevel - 1]})`;
+            music.src = musicTracks[currentLevel - 1];
+            music.play();
+        }
+
+        // Initialize game
+        resetGame();
+        setInterval(moveMonsters, 50); // Move monsters every 50ms for more dynamic movement
+    </script>
+</body>
+</html>
